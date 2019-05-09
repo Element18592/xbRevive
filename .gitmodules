@@ -1,0 +1,3 @@
+[submodule "XSidecar"]
+	path = XSidecar
+	url = https://github.com/iMoD1998/XSidecar.git
