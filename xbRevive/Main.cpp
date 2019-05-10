@@ -88,7 +88,7 @@ BOOL _inline SPIEnd( HANDLE Sidecar )
 {
 	if ( XSidecarEmulatorSpiEnd( Sidecar ) == 0 )
 	{
-		printf( "XSidecarEmulatorSpiEnd: Success\n" );
+		printf( "XSidecarEmulatorSpiEnd: Failed\n" );
 		return FALSE;
 	}
 
@@ -185,22 +185,16 @@ DWORD _inline GetPagesPerBlock( BOOL Logical )
 
 DWORD _inline IndexToAddress( DWORD BlockIndex, DWORD PageIndex, BOOL Logical )
 {
-	return ( BlockIndex * GetBlockSize( Logical ) ) + ( PageIndex * GetPageSize( Logical ) );
+	return ( BlockIndex * JASPER_LOGICAL_BLOCK_SIZE ) + ( PageIndex * JASPER_LOGICAL_PAGE_SIZE );
 }
 
 DWORD ReadPage( HANDLE Sidecar, DWORD Address, BYTE* Buffer, BOOL Logical )
 {
 	DWORD PageSize = GetPageSize( Logical );
 
-	if ( Address % PageSize != 0 )
-	{
-		printf( "[ERROR] Misaligned Address\n" );
-		return 0;
-	}
-
 	WriteSPIReg( Sidecar, SFCX_ADDRESS, Address );
 
-	SPIDoCommand( Sidecar, Logical ? PHY_PAGE_TO_BUF : LOG_PAGE_TO_BUF );
+	SPIDoCommand( Sidecar, Logical ? LOG_PAGE_TO_BUF : PHY_PAGE_TO_BUF );
 
 	WriteSPIReg( Sidecar, SFCX_ADDRESS, 0 );
 
@@ -231,7 +225,7 @@ DWORD ReadBlock( HANDLE Sidecar, DWORD BlockID, BYTE* Buffer, BOOL Logical )
 {
 	for ( int i = 0; i < GetPagesPerBlock( Logical ); ++i )
 	{
-		DWORD Offset = IndexToAddress( 0, i, Logical );
+		DWORD Offset = GetPageSize(Logical) * i;
 
 		DWORD Status = ReadPage( Sidecar, BlockID, i, &Buffer[ Offset ], Logical );
 	}
@@ -334,7 +328,6 @@ void ReadNAND( HANDLE Sidecar )
 
 			fwrite( BlockBuffer, 1, JASPER_PHYSICAL_BLOCK_SIZE, DumpFile );
 		}
-
 
 		printf( "Finished\n" );
 
@@ -442,7 +435,7 @@ int main( int argc, const char* argv[] )
 
 		printf( "Entering Flash Mode...\n" );
 
-		SPIEnd( Sidecar );
+		//SPIEnd( Sidecar );
 
 		if ( SPIBegin( Sidecar ) )
 		{
