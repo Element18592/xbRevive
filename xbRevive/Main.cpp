@@ -55,7 +55,11 @@ typedef unsigned long long QWORD;
 #define STATUS_BUSY         	0x1u			//Busy
 #define STATUS_ERROR			(STATUS_ILL_LOG|STATUS_ADDR_ER|STATUS_BB_ER|STATUS_RNP_ER|STATUS_ECC_ER|STATUS_WR_ER)
 
-//Jasper 512 MB NAND WITH CONFIG 0xAA3020
+//Jasper 16 MB NAND WITH CONFIG 0x00023010 
+
+//Jasper 256 MB NAND WITH CONFIG 0x008A3020 
+
+//Jasper 512 MB NAND WITH CONFIG 0xAA3020 
 //0x21000 PHYSICAL BLOCK SIZE
 //0x210 PHYSICAL PAGE SIZE
 //PHYSICAL = PAGE DATA + META DATA (ECC)
@@ -108,17 +112,17 @@ DWORD ReadSPIReg( HANDLE Sidecar, BYTE Register )
 		return 0;
 	}
 
-	BYTE Buffer[ 100 ] = { 0 };
+	DWORD Buffer = 0;
 	DWORD BytesRead = 0;
 
-	if ( XSidecarEmulatorSpiRead( Sidecar, Buffer, 4, &BytesRead ) == 0 )
+	if ( XSidecarEmulatorSpiRead( Sidecar, (PBYTE)&Buffer, 4, &BytesRead ) == 0 )
 	{
 		printf( "XSidecarEmulatorSpiRead: Failed\n" );
 
 		return 0;
 	}
 
-	return *(DWORD*)&Buffer[ 0 ];
+	return Buffer;
 }
 
 BOOL WriteSPIReg( HANDLE Sidecar, BYTE Register, DWORD Data )
@@ -155,10 +159,7 @@ DWORD _inline GetConfig( HANDLE Sidecar )
 
 void WaitWhileBusy( HANDLE Sidecar )
 {
-	while ( GetStatus( Sidecar ) & STATUS_BUSY )
-	{
-		printf( "Busy lmao\n" );
-	}
+
 }
 
 void SPIDoCommand( HANDLE Sidecar, BYTE Command )
@@ -204,7 +205,7 @@ DWORD ReadPage( HANDLE Sidecar, DWORD Address, BYTE* Buffer, BOOL Logical )
 		*(DWORD*)( &Buffer[ i ] ) = ReadSPIReg( Sidecar, SFCX_DATA );  // get contents of dataregister
 	}
 
-	return GetStatus( Sidecar );
+	return 0;
 }
 
 DWORD ReadPage( HANDLE Sidecar, DWORD BlockIndex, DWORD PageIndex, BYTE* Buffer, BOOL Logical )
@@ -225,12 +226,12 @@ DWORD ReadBlock( HANDLE Sidecar, DWORD BlockID, BYTE* Buffer, BOOL Logical )
 {
 	for ( int i = 0; i < GetPagesPerBlock( Logical ); ++i )
 	{
-		DWORD Offset = GetPageSize(Logical) * i;
+		DWORD Offset = GetPageSize( Logical ) * i;
 
 		DWORD Status = ReadPage( Sidecar, BlockID, i, &Buffer[ Offset ], Logical );
 	}
 
-	return GetStatus( Sidecar );
+	return 0;
 }
 
 DWORD WritePage( HANDLE Sidecar, DWORD Address, BYTE* Buffer, BOOL Logical )
@@ -252,7 +253,7 @@ DWORD WritePage( HANDLE Sidecar, DWORD Address, BYTE* Buffer, BOOL Logical )
 	}
 
 	SPIDoCommand( Sidecar, UNLOCK_CMD_0 );
-						   
+
 	SPIDoCommand( Sidecar, UNLOCK_CMD_1 );
 
 	SPIDoCommand( Sidecar, WRITE_PAGE_TO_PHY );
@@ -274,7 +275,7 @@ DWORD WritePage( HANDLE Sidecar, DWORD BlockIndex, DWORD PageIndex, BYTE* Buffer
 
 DWORD EraseBlock( HANDLE Sidecar, DWORD BlockID )
 {
-	WriteSPIReg( Sidecar, SFCX_ADDRESS, IndexToAddress(BlockID, 0, FALSE) );
+	WriteSPIReg( Sidecar, SFCX_ADDRESS, IndexToAddress( BlockID, 0, FALSE ) );
 
 	SPIDoCommand( Sidecar, UNLOCK_CMD_1 );
 	SPIDoCommand( Sidecar, UNLOCK_CMD_0 );
@@ -288,7 +289,7 @@ DWORD WriteBlock( HANDLE Sidecar, DWORD BlockID, BYTE* Buffer, BOOL Logical )
 {
 	if ( Logical )
 		return STATUS_ERROR; // Not done yet
-	
+
 	EraseBlock( Sidecar, BlockID );
 
 	for ( int i = 0; i < GetPagesPerBlock( Logical ); ++i )
@@ -303,12 +304,14 @@ DWORD WriteBlock( HANDLE Sidecar, DWORD BlockID, BYTE* Buffer, BOOL Logical )
 
 void ReadNAND( HANDLE Sidecar )
 {
-	BYTE BlockBuffer[ JASPER_PHYSICAL_BLOCK_SIZE ];
-
 	FILE* DumpFile;
 
 	if ( fopen_s( &DumpFile, "Nand.bin", "wb+" ) == 0 )
 	{
+		unsigned int config = ReadSPIReg( Sidecar, SFCX_CONFIG );
+
+		WriteSPIReg( Sidecar, SFCX_CONFIG, config & ~( CONFIG_INT_EN | CONFIG_WP_EN | CONFIG_DMA_LEN ) );
+
 		DWORD NumBlocks = 10;
 
 		printf( "Reading blocks:  Logical      Physical\n" );
@@ -324,9 +327,11 @@ void ReadNAND( HANDLE Sidecar )
 
 			printf( "                 0x%08X - 0x%08X          (%3.2f%%)\n", Logical, Physical, PercentDone );
 
-			ReadBlock( Sidecar, i, BlockBuffer, FALSE );
+			BYTE Block[ JASPER_PHYSICAL_BLOCK_SIZE ];
 
-			fwrite( BlockBuffer, 1, JASPER_PHYSICAL_BLOCK_SIZE, DumpFile );
+			ReadBlock( Sidecar, i, Block, FALSE );
+
+			fwrite( Block, 1, JASPER_PHYSICAL_BLOCK_SIZE, DumpFile );
 		}
 
 		printf( "Finished\n" );
@@ -346,10 +351,12 @@ void FlashNand( HANDLE Sidecar )
 	if ( fopen_s( &FlashFile, "NandToFlash.bin", "wb+" ) == 0 )
 	{
 		fseek( FlashFile, 0, SEEK_END ); // seek to end of file
-		
+
 		SIZE_T Size = ftell( FlashFile ); // get current file pointer
 
 		fseek( FlashFile, 0, SEEK_SET ); // seek back to beginning of file
+
+		WriteSPIReg( Sidecar, SFCX_CONFIG, ReadSPIReg( Sidecar, SFCX_CONFIG ) | CONFIG_WP_EN );
 
 		if ( Size % JASPER_PHYSICAL_BLOCK_SIZE != 0 )
 		{
