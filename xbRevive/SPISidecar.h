@@ -57,7 +57,7 @@ public:
 		DWORD Buffer = 0;
 		DWORD BytesRead = 0;
 
-		if ( XSidecarEmulatorSpiRead( this->Sidecar, (PBYTE)& Buffer, 4, &BytesRead ) == 0 )
+		if ( XSidecarEmulatorSpiRead( this->Sidecar, (PBYTE)&Buffer, 4, &BytesRead ) == 0 )
 		{
 			printf( "XSidecarEmulatorSpiRead: Failed\n" );
 

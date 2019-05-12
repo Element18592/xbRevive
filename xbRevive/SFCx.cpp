@@ -21,15 +21,29 @@ bool SFCx::ParseConfig( )
 
 	/*Do Some Shit*/
 	Config->LogicalBlockSize = 0x20000;
+	Config->NumberOfBlocks = 0x1000;
+
 	Config->PagesPerBlock = Config->LogicalBlockSize / Config->LogicalPageSize;
 
 	Config->PhysicalBlockSize = Config->PhysicalPageSize * Config->PagesPerBlock;
 
-	Config->NumberOfBlocks = 0x1000;
-
 	Config->NumberOfPages = Config->PagesPerBlock * Config->NumberOfBlocks;
 
 	return true;
+}
+
+void SFCx::ToggleWriteProtection( bool Enabled )
+{
+	DWORD Config = this->ReadRegister( SFCX_CONFIG );
+
+	if ( Enabled )
+	{
+		this->WriteRegister( SFCX_CONFIG, Config | CONFIG_WP_EN );
+	}
+	else
+	{
+		this->WriteRegister( SFCX_CONFIG, Config & ~( CONFIG_WP_EN ) );
+	}
 }
 
 void SFCx::DoCommand(BYTE Command, bool PollBusy, bool ErrorCheck)
@@ -38,7 +52,7 @@ void SFCx::DoCommand(BYTE Command, bool PollBusy, bool ErrorCheck)
 	{
 		this->WriteRegister( SFCX_COMMAND, Command );
 
-		if ( Command == LOG_PAGE_TO_BUF || Command == PHY_PAGE_TO_BUF || Command == WRITE_PAGE_TO_PHY || Command == BLOCK_ERASE )
+		if ( Command == LOG_PAGE_TO_BUF || Command == PHY_PAGE_TO_BUF || Command == WRITE_PAGE_TO_PHY || Command == BLOCK_ERASE ) // needs to be changed
 		{
 			DWORD Status = 0;
 
@@ -78,9 +92,7 @@ void SFCx::ECCEncodePage(BYTE* PageData)
 
 void SFCx::EraseBlock( DWORD BlockIndex )
 {
-	DWORD Config = this->ReadRegister( SFCX_CONFIG );
-
-	this->WriteRegister( SFCX_CONFIG, Config | CONFIG_WP_EN );
+	this->ToggleWriteProtection( false );
 
 	this->WriteRegister( SFCX_ADDRESS, BlockIndex * this->Config.LogicalBlockSize );
 
@@ -88,6 +100,8 @@ void SFCx::EraseBlock( DWORD BlockIndex )
 	this->DoCommand( UNLOCK_CMD_0 );
 
 	this->DoCommand( BLOCK_ERASE );
+
+	this->ToggleWriteProtection( true );
 }
 
 DWORD SFCx::ReadPage( DWORD LogicalAddress, BYTE* Buffer, bool Physical )
@@ -119,6 +133,8 @@ DWORD SFCx::ReadPage( DWORD BlockIndex, DWORD PageIndex, BYTE* Buffer, bool Phys
 
 DWORD SFCx::WritePage( WORD LogicalAddress, BYTE* Buffer, bool Physical )
 {
+	this->ToggleWriteProtection( false );
+
 	this->WriteRegister( SFCX_ADDRESS, 0 );
 
 	auto PageSize = Physical ? this->Config.PhysicalPageSize : this->Config.LogicalPageSize;
@@ -136,6 +152,8 @@ DWORD SFCx::WritePage( WORD LogicalAddress, BYTE* Buffer, bool Physical )
 	this->DoCommand( UNLOCK_CMD_1 );
 
 	this->DoCommand( WRITE_PAGE_TO_PHY );
+
+	this->ToggleWriteProtection( true );
 
 	return 0;
 }

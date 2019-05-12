@@ -70,30 +70,6 @@
 #define STATUS_ERROR			(STATUS_ILL_LOG|STATUS_ADDR_ER|STATUS_BB_ER|STATUS_RNP_ER|STATUS_ECC_ER|STATUS_WR_ER)
 
 
-//	DWORD SW_RST		: 1; // [0 - 1]
-//	DWORD ECC_DIS		: 1; // [1 - 2]
-//	DWORD INT_EN		: 1; // [2 - 3]
-//	DWORD WP_EN			: 1; // [3 - 4]
-//	DWORD FLSH_SIZE		: 2; // [4 - 6]
-//	DWORD DMA_LEN		: 4; // [6 - 10]
-//	DWORD BYPASS		: 1; // [10 - 11]
-//	DWORD ULT_DLY		: 6; // [11 - 17]
-//	DWORD CSR_DLY		: 8; // [17 - 25]
-//	DWORD DIS_EXT_ER	: 1; // [25 - 26]
-//	DWORD DBG_MUX_SEL	: 5; // [26 - 31]
-
-
-struct _FLASH_PART_INFO
-{
-	unsigned int dwPagePerBlock;
-	unsigned int dwNumBlocks;
-	unsigned int dwNumReservedBlocks;
-	unsigned int dwNumPages;
-	unsigned int dwBlockNumBytes;
-	unsigned int dwNumBytes;
-	unsigned int dwNumLogicalBytes;
-};
-
 // Was going to use this but do we want portability?
 //struct SFCxConfigRegister
 //{
@@ -123,25 +99,6 @@ struct _FLASH_PART_INFO
 //	DWORD PIN_WP_N	: 1; // [11 - 12]
 //	DWORD ILL_LOG	: 1; // [12 - 13]
 //};
-
-//struct SFCPartInfo
-//{
-//	DWORD PagesPerBlock;
-//	DWORD NumberOfBlocks;
-//	DWORD NumberOfReservedBlocks;
-//	DWORD NumberOfPages;
-//	DWORD LogicalBlockSize;
-//	DWORD Size;
-//	DWORD LogicalSize;
-//};
-
-//SFCPartInfo Devices[] = {
-//	{ 0x8c, 0x00 }
-//	{ 0x8c, 0x01 }
-//  { 0x45, 0x00 } 
-//	{ 0x55, 0x0 }
-//}
-
 
 
 struct SFCxConfig
@@ -193,6 +150,8 @@ public:
 	DWORD GetStatus( );
 
 	bool ParseConfig( );
+
+	void ToggleWriteProtection( bool Enabled );
 
 	void DoCommand( BYTE Command, bool PollBusy = false, bool ErrorCheck = false );
 

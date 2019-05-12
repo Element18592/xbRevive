@@ -1,5 +1,6 @@
 #include <Windows.h>
 #include <stdio.h>
+#include <chrono>
 
 #include "SPISidecar.h"
 
@@ -64,7 +65,6 @@ HANDLE GetSidecar( )
 	return Sidecar;
 }
 
-#include <chrono>
 
 void DumpFlash( SFCx* Nand )
 {
@@ -72,6 +72,8 @@ void DumpFlash( SFCx* Nand )
 
 	if ( fopen_s( &DumpFile, "Nand.bin", "wb+" ) == 0 )
 	{
+		printf( "[%s] Entering Flashing Mode\n", Nand->GetName( ) );
+
 		Nand->EnterFlashMode( );
 
 		Nand->ParseConfig( );
@@ -85,8 +87,6 @@ void DumpFlash( SFCx* Nand )
 			printf( "Failed To Allocate Block\n" );
 			return;
 		}
-
-		memset( BlockBuffer, 0xCC, Nand->Config.PhysicalBlockSize );
 
 		DWORD NumberOfPages = Nand->Config.NumberOfBlocks * Nand->Config.PagesPerBlock;
 
@@ -125,11 +125,109 @@ void DumpFlash( SFCx* Nand )
 
 		printf( "\nRead Nand Took: %lli ms\n", ElapsedNand.count( ) );
 
+		printf( "[%s] Exiting Flashing Mode\n", Nand->GetName( ) );
+
 		Nand->ExitFlashMode( );
 
 		free( BlockBuffer );
 
 		fclose( DumpFile );
+	}
+	else
+	{
+		printf( "Couldnt Open Dump File\n" );
+	}
+}
+
+void FlashNand( SFCx* Nand )
+{
+	FILE* FlashFile;
+
+	if ( fopen_s( &FlashFile, "NandToFlash.bin", "wb+" ) == 0 )
+	{
+		printf( "[%s] Entering Flashing Mode\n", Nand->GetName( ) );
+
+		Nand->EnterFlashMode( );
+
+		Nand->ParseConfig( );
+
+		fseek( FlashFile, 0, SEEK_END ); // seek to end of file
+
+		SIZE_T Size = ftell( FlashFile ); // get current file pointer
+
+		fseek( FlashFile, 0, SEEK_SET ); // seek back to beginning of file
+
+		if ( Size % Nand->Config.PhysicalBlockSize != 0 )
+		{
+			printf( "File Misaligned to blocks" );
+			return;
+		}
+
+		if ( Size % Nand->Config.PhysicalPageSize != 0 )
+		{
+			printf( "File Misaligned to pages" );
+			return;
+		}
+
+		Nand->Config.NumberOfBlocks = Size / Nand->Config.PhysicalBlockSize;
+
+		BYTE* BlockBuffer = (BYTE*)malloc( Nand->Config.PhysicalBlockSize );
+
+		if ( !BlockBuffer )
+		{
+			printf( "Failed To Allocate Block\n" );
+			return;
+		}
+
+		DWORD NumberOfPages = Nand->Config.NumberOfBlocks * Nand->Config.PagesPerBlock;
+
+		printf( "Page Size (Logical): %i\n", Nand->Config.LogicalPageSize );
+		printf( "Block Size (Logical): %i\n", Nand->Config.LogicalBlockSize );
+		printf( "Flashing: %i Blocks\n", Nand->Config.NumberOfBlocks );
+		printf( "Flashing Physical Pages (PAGE + META)\n" );
+
+		auto StartNand = std::chrono::steady_clock::now( );
+
+		for ( int i = 0; i < Nand->Config.NumberOfBlocks; ++i )
+		{
+			fread( BlockBuffer, 1, Nand->Config.PhysicalBlockSize, FlashFile );
+
+			for ( int j = 0; j < Nand->Config.PagesPerBlock; ++j )
+			{
+				auto StartPage = std::chrono::steady_clock::now( );
+
+				Nand->WritePage( i, j, &BlockBuffer[ j * Nand->Config.PhysicalPageSize ], true );
+
+				auto EndPage = std::chrono::steady_clock::now( );
+
+				auto ElapsedPage = std::chrono::duration_cast<std::chrono::milliseconds>( EndPage - StartPage );
+
+				DWORD CompletedPages = ( i * Nand->Config.PagesPerBlock ) + j + 1;
+
+				float Percentage = ( (double)CompletedPages / (double)NumberOfPages ) * 100.0;
+
+				printf( "\rFlashing Nand  %0.03f%% (%i/%i Pages) (%i/%i Blocks) Page Took: %lli ms", Percentage, CompletedPages, NumberOfPages, i + 1, Nand->Config.NumberOfBlocks, ElapsedPage.count( ) );
+			}
+
+		}
+
+		auto EndNand = std::chrono::steady_clock::now( );
+
+		auto ElapsedNand = std::chrono::duration_cast<std::chrono::milliseconds>( EndNand - StartNand );
+
+		printf( "\nFlash Nand Took: %lli ms\n", ElapsedNand.count( ) );
+
+		printf( "[%s] Exiting Flashing Mode\n", Nand->GetName( ) );
+
+		Nand->ExitFlashMode( );
+
+		free( BlockBuffer );
+
+		fclose( FlashFile );
+	}
+	else
+	{
+		printf( "Couldnt Open Flash File\n" );
 	}
 }
 
@@ -165,6 +263,32 @@ bool ProcessArgs( int argc, const char* argv[ ] )
 
 			break;
 		}
+
+		if ( strcmp( argv[ i ], "Flash" ) == 0 )
+		{
+			printf( "Flashing\n" );
+
+			auto Sidecar = GetSidecar( );
+
+			if ( Sidecar )
+			{
+				WCHAR ConsoleNameBuffer[ 0x200 ];
+
+				XSidecarGetName( Sidecar, ConsoleNameBuffer, 0x200, 0 );
+
+				printf( "Connected To: %ws\n", ConsoleNameBuffer );
+
+				SPISidecar Nand = SPISidecar( Sidecar ); // woud be what ever interface they asked for
+
+				FlashNand( &Nand );
+			}
+			else
+			{
+				printf( "Failed To Connect To Sidecar\n" );
+			}
+
+			break;
+		}
 	}
 
 	return true;
@@ -182,12 +306,12 @@ int main( int argc, const char* argv[ ] )
 
 	if ( LoadXSidecar( ) )
 	{
-		const char* TempArgs[ ] = {
-			"",
+		const char* TestArgs[ ] = {
+			argv[0],
 			"Dump"
 		};
 
-		if ( !ProcessArgs( 2, TempArgs ) )
+		if ( !ProcessArgs( ARRAYSIZE( TestArgs ), TestArgs ) )
 		{
 			PrintUsage( );
 		}
