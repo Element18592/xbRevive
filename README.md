@@ -1,5 +1,5 @@
 # xbRevive
-### XbRevive is a tool for flashing the Xbox 360 console.
+### xbRevive is a tool for flashing the Xbox 360 console.
 
 At the moment it only supports flashing Jasper nands with a block size of 512MB through the sidecar, configuration can be adjusted in SFCx.cpp,
 support for USB flashers (NAND-X, etc) is a future goal.
