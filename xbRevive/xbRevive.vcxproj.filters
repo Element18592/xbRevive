@@ -2,5 +2,27 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="SPISidecar.cpp">
+      <Filter>SPISidecar</Filter>
+    </ClCompile>
+    <ClCompile Include="SFCx.cpp">
+      <Filter>SFCx</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SPISidecar.h">
+      <Filter>SPISidecar</Filter>
+    </ClInclude>
+    <ClInclude Include="SFCx.h">
+      <Filter>SFCx</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="SFCx">
+      <UniqueIdentifier>{7354fe58-8e70-4a9a-aa7d-c234eed3e29b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SPISidecar">
+      <UniqueIdentifier>{8a74fe32-2d62-496a-be9f-be96b7df0e70}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>

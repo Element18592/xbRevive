@@ -153,6 +153,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="SFCx.cpp" />
+    <ClCompile Include="SPISidecar.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SFCx.h" />
+    <ClInclude Include="SPISidecar.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
