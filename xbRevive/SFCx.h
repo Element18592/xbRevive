@@ -163,7 +163,7 @@ public:
 
 	DWORD ReadPage( DWORD BlockIndex, DWORD PageIndex, BYTE* Buffer, bool Physical );
 
-	DWORD WritePage( WORD LogicalAddress, BYTE* Buffer, bool Physical );
+	DWORD WritePage( DWORD LogicalAddress, BYTE* Buffer, bool Physical );
 
 	DWORD WritePage( DWORD BlockIndex, DWORD PageIndex, BYTE* Buffer, bool Physical );
 };

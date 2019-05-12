@@ -131,7 +131,7 @@ DWORD SFCx::ReadPage( DWORD BlockIndex, DWORD PageIndex, BYTE* Buffer, bool Phys
 	return SFCx::ReadPage( BlockAddress + PageOffset, Buffer, Physical );
 }
 
-DWORD SFCx::WritePage( WORD LogicalAddress, BYTE* Buffer, bool Physical )
+DWORD SFCx::WritePage( DWORD LogicalAddress, BYTE* Buffer, bool Physical )
 {
 	this->ToggleWriteProtection( false );
 
